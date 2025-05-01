@@ -1,15 +1,15 @@
 //Simulation.js
-import { getWriteBuffer, getGridConfig, getIndexFromPosition, isValidPosition, 
-         getParticleType, setParticleType, setMoving, isMoving, 
-         getVelocityX, setVelocityX, getVelocityY, setVelocityY, ParticleType } from './Initialise.js';
+// Responsibility: Simulation timing, coordination, and overall simulation state management
+import { getGridConfig } from './Initialise.js';
+import { getWriteBuffer, getIndexFromPosition, isValidPosition, ParticleType } from './ParticleGrid.js';
 
 let frameCount = 0;
 
-function moveParticle(writeBuffer, x, y, currentIndex, currentCell) {
+function moveParticle(writeBuffer, x, y, currentIndex) {
     const gridConfig = getGridConfig();
     const { rows } = gridConfig;
-    const velocityY = getVelocityY(currentCell);
-    const currentType = getParticleType(currentCell);
+    const velocityY = writeBuffer.velocityYArray[currentIndex];
+    const currentType = writeBuffer.typeArray[currentIndex];
     
     // Try to move down first
     let moveDistance = velocityY;
@@ -26,17 +26,19 @@ function moveParticle(writeBuffer, x, y, currentIndex, currentCell) {
         }
         
         const targetIndex = getIndexFromPosition(x, targetY);
-        const targetType = getParticleType(writeBuffer[targetIndex]);
+        const targetType = writeBuffer.typeArray[targetIndex];
         
         // If target cell is empty, move the particle
         if (targetType === ParticleType.EMPTY) {
             // Move particle to target position
-            writeBuffer[targetIndex] = setParticleType(writeBuffer[targetIndex], currentType);
-            writeBuffer[targetIndex] = setVelocityY(writeBuffer[targetIndex], velocityY);
-            writeBuffer[targetIndex] = setVelocityX(writeBuffer[targetIndex], getVelocityX(currentCell));
+            writeBuffer.typeArray[targetIndex] = currentType;
+            writeBuffer.velocityYArray[targetIndex] = velocityY;
+            writeBuffer.velocityXArray[targetIndex] = writeBuffer.velocityXArray[currentIndex];
+            writeBuffer.movingArray[targetIndex] = 1;
             
             // Clear current cell
-            writeBuffer[currentIndex] = setParticleType(writeBuffer[currentIndex], ParticleType.EMPTY);
+            writeBuffer.typeArray[currentIndex] = ParticleType.EMPTY;
+            writeBuffer.movingArray[currentIndex] = 0;
             return true;
         }
         
@@ -44,16 +46,16 @@ function moveParticle(writeBuffer, x, y, currentIndex, currentCell) {
     }
 
     // If we couldn't move down, try horizontal movement based on particle type
-    return tryHorizontalMove(writeBuffer, x, y, currentIndex, currentCell);
+    return tryHorizontalMove(writeBuffer, x, y, currentIndex);
 }
 
-function tryHorizontalMove(writeBuffer, x, y, currentIndex, currentCell) {
-    const currentType = getParticleType(currentCell);
-    const velocityX = getVelocityX(currentCell);
+function tryHorizontalMove(writeBuffer, x, y, currentIndex) {
+    const currentType = writeBuffer.typeArray[currentIndex];
+    const velocityX = writeBuffer.velocityXArray[currentIndex];
 
     switch (currentType) {
         case ParticleType.SAND:
-            return sandHorizontalMove(writeBuffer, x, y, currentIndex, currentCell, velocityX);
+            return sandHorizontalMove(writeBuffer, x, y, currentIndex, velocityX);
         case ParticleType.WATER:
             // Add water horizontal movement later
             return false;
@@ -65,17 +67,20 @@ function tryHorizontalMove(writeBuffer, x, y, currentIndex, currentCell) {
     }
 }
 
-function sandHorizontalMove(writeBuffer, x, y, currentIndex, currentCell, velocityX) {
+function sandHorizontalMove(writeBuffer, x, y, currentIndex, velocityX) {
     // Try down-left
     const downLeftX = x - velocityX;
     const downLeftY = y + 1;
     if (isValidPosition(downLeftX, downLeftY)) {
         const downLeftIndex = getIndexFromPosition(downLeftX, downLeftY);
-        if (getParticleType(writeBuffer[downLeftIndex]) === ParticleType.EMPTY) {
-            writeBuffer[downLeftIndex] = setParticleType(writeBuffer[downLeftIndex], ParticleType.SAND);
-            writeBuffer[downLeftIndex] = setVelocityY(writeBuffer[downLeftIndex], getVelocityY(currentCell));
-            writeBuffer[downLeftIndex] = setVelocityX(writeBuffer[downLeftIndex], velocityX);
-            writeBuffer[currentIndex] = setParticleType(writeBuffer[currentIndex], ParticleType.EMPTY);
+        if (writeBuffer.typeArray[downLeftIndex] === ParticleType.EMPTY) {
+            writeBuffer.typeArray[downLeftIndex] = ParticleType.SAND;
+            writeBuffer.velocityYArray[downLeftIndex] = writeBuffer.velocityYArray[currentIndex];
+            writeBuffer.velocityXArray[downLeftIndex] = velocityX;
+            writeBuffer.movingArray[downLeftIndex] = 1;
+            
+            writeBuffer.typeArray[currentIndex] = ParticleType.EMPTY;
+            writeBuffer.movingArray[currentIndex] = 0;
             return true;
         }
     }
@@ -85,11 +90,14 @@ function sandHorizontalMove(writeBuffer, x, y, currentIndex, currentCell, veloci
     const downRightY = y + 1;
     if (isValidPosition(downRightX, downRightY)) {
         const downRightIndex = getIndexFromPosition(downRightX, downRightY);
-        if (getParticleType(writeBuffer[downRightIndex]) === ParticleType.EMPTY) {
-            writeBuffer[downRightIndex] = setParticleType(writeBuffer[downRightIndex], ParticleType.SAND);
-            writeBuffer[downRightIndex] = setVelocityY(writeBuffer[downRightIndex], getVelocityY(currentCell));
-            writeBuffer[downRightIndex] = setVelocityX(writeBuffer[downRightIndex], velocityX);
-            writeBuffer[currentIndex] = setParticleType(writeBuffer[currentIndex], ParticleType.EMPTY);
+        if (writeBuffer.typeArray[downRightIndex] === ParticleType.EMPTY) {
+            writeBuffer.typeArray[downRightIndex] = ParticleType.SAND;
+            writeBuffer.velocityYArray[downRightIndex] = writeBuffer.velocityYArray[currentIndex];
+            writeBuffer.velocityXArray[downRightIndex] = velocityX;
+            writeBuffer.movingArray[downRightIndex] = 1;
+            
+            writeBuffer.typeArray[currentIndex] = ParticleType.EMPTY;
+            writeBuffer.movingArray[currentIndex] = 0;
             return true;
         }
     }
@@ -108,14 +116,13 @@ export function simulationLoop() {
     for (let y = rows - 1; y >= 0; y--) {
         for (let x = 0; x < cols; x++) {
             const currentIndex = getIndexFromPosition(x, y);
-            const currentCell = writeBuffer[currentIndex];
-            const currentType = getParticleType(currentCell);
+            const currentType = writeBuffer.typeArray[currentIndex];
 
             // Skip empty cells
             if (currentType === ParticleType.EMPTY) continue;
 
             // Try to move the particle
-            moveParticle(writeBuffer, x, y, currentIndex, currentCell);
+            moveParticle(writeBuffer, x, y, currentIndex);
         }
     }
 }

@@ -1,5 +1,7 @@
 // ProfilingTools.js
-import { getGridConfig, getReadBuffer, getWriteBuffer, getParticleType, isMoving, getMousePosition, isMouseButtonDown, getGridPositionFromMouse } from './Initialise.js';
+// Responsibility: Performance monitoring and debugging tools for the simulation
+import { getGridConfig, getMousePosition, isMouseButtonDown, getGridPositionFromMouse } from './Initialise.js';
+import { getReadBuffer, ParticleType } from './ParticleGrid.js';
 
 let fpsDisplayElement = null;
 let particleDisplayElement = null;
@@ -7,7 +9,13 @@ let fpsFrames = 0;
 let fpsLastTime = Date.now();
 let showChunkGrid = false;
 let frameTimes = [];
-let lastFrameTime = Date.now();
+let lastFrameTime = performance.now();
+let particleCounts = {
+    [ParticleType.EMPTY]: 0,
+    [ParticleType.SAND]: 0,
+    [ParticleType.WATER]: 0,
+    [ParticleType.STONE]: 0
+};
 
 // Initialize profiling tools UI and behaviors
 export function initProfilingTools() {
@@ -25,6 +33,47 @@ export function initProfilingTools() {
   particleDisplayElement = document.getElementById('particleDisplay');
 }
 
+export function updateFrameTime() {
+    const currentTime = performance.now();
+    const frameTime = currentTime - lastFrameTime;
+    lastFrameTime = currentTime;
+    
+    frameTimes.push(frameTime);
+    if (frameTimes.length > 60) {
+        frameTimes.shift();
+    }
+}
+
+export function getAverageFrameTime() {
+    if (frameTimes.length === 0) return 0;
+    return frameTimes.reduce((a, b) => a + b) / frameTimes.length;
+}
+
+export function updateParticleCounts() {
+    const readBuffer = getReadBuffer();
+    const gridConfig = getGridConfig();
+    const { totalCells } = gridConfig;
+    
+    // Reset counts
+    Object.keys(particleCounts).forEach(type => {
+        particleCounts[type] = 0;
+    });
+    
+    // Count particles
+    for (let i = 0; i < totalCells; i++) {
+        const type = readBuffer.typeArray[i];
+        particleCounts[type]++;
+    }
+}
+
+export function getParticleCounts() {
+    return particleCounts;
+}
+
+export function getFPS() {
+    const avgFrameTime = getAverageFrameTime();
+    return avgFrameTime > 0 ? Math.round(1000 / avgFrameTime) : 0;
+}
 
 export function fpsCounter() {
   if (!fpsDisplayElement || !particleDisplayElement) return;

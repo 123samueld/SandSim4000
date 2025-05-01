@@ -1,7 +1,10 @@
-import { initCanvas, initGrid, initGameStateBuffers, initMouseInput, spawnInitialParticles } from './Initialise.js';
+// Main.js
+// Responsibility: Application entry point and main game loop coordination
+import { initCanvas, initGrid, initGameStateBuffers, initMouseInput } from './Initialise.js';
 import { initProfilingTools, fpsCounter } from './ProfilingTools.js';
-import { renderingLoop } from './Rendering.js';
+import { render } from './Rendering.js';
 import { simulationLoop } from './Simulation.js';
+import { spawnParticles } from './ParticleGrid.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     initCanvas();
@@ -17,10 +20,10 @@ function gameLoop() {
     simulationLoop();
     
     // Spawn particles at mouse position if button is down
-    spawnInitialParticles();
+    spawnParticles();
     
     // Render the particles
-    renderingLoop();
+    render();
     
     // Update performance metrics
     fpsCounter();
