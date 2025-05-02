@@ -108,16 +108,16 @@ export function fpsCounter() {
 
     // Count and display moving particles
     const readBuffer = getReadBuffer();
-    let movingParticles = 0;
-    for (let i = 0; i < readBuffer.length; i++) {
-      if (isMoving(readBuffer[i])) { // Only count particles that are moving
-        movingParticles++;
+    let totalParticles = 0;
+    for (let i = 0; i < readBuffer.typeArray.length; i++) {
+      if (readBuffer.typeArray[i] !== ParticleType.EMPTY) {
+        totalParticles++;
       }
     }
     
     const particleSpan = particleDisplayElement.querySelector('span');
     if (particleSpan) {
-      particleSpan.textContent = `Moving Particles: ${movingParticles}`;
+      particleSpan.textContent = `Particles: ${totalParticles}`;
     }
 
   }

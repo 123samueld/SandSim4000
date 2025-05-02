@@ -12,9 +12,26 @@ export const ParticleType = {
 
 // Struct of Arrays (SoA) implementation
 let typeArray;          // Uint8Array for particle types
-let movingArray;        // Uint8Array for movement state
+let movingArray;        // Uint8Array for movement state (bit-packed booleans)
 let velocityXArray;     // Uint8Array for X velocity
 let velocityYArray;     // Uint8Array for Y velocity
+
+// Helper functions for bit-packed boolean array
+function getBit(array, index) {
+    const byteIndex = Math.floor(index / 8);
+    const bitIndex = index % 8;
+    return (array[byteIndex] & (1 << bitIndex)) !== 0;
+}
+
+function setBit(array, index, value) {
+    const byteIndex = Math.floor(index / 8);
+    const bitIndex = index % 8;
+    if (value) {
+        array[byteIndex] |= (1 << bitIndex);
+    } else {
+        array[byteIndex] &= ~(1 << bitIndex);
+    }
+}
 
 export function initialiseParticleGrid() {
     const gridConfig = getGridConfig();
@@ -24,7 +41,8 @@ export function initialiseParticleGrid() {
 
     // Initialize separate arrays for each property
     typeArray = new Uint8Array(gridConfig.totalCells);
-    movingArray = new Uint8Array(gridConfig.totalCells);
+    // Calculate size needed for bit-packed booleans (1 byte per 8 booleans)
+    movingArray = new Uint8Array(Math.ceil(gridConfig.totalCells / 8));
     velocityXArray = new Uint8Array(gridConfig.totalCells);
     velocityYArray = new Uint8Array(gridConfig.totalCells);
 }
@@ -34,7 +52,8 @@ export function getReadBuffer() {
         typeArray,
         movingArray,
         velocityXArray,
-        velocityYArray
+        velocityYArray,
+        getMoving: (index) => getBit(movingArray, index)
     };
 }
 
@@ -43,7 +62,9 @@ export function getWriteBuffer() {
         typeArray,
         movingArray,
         velocityXArray,
-        velocityYArray
+        velocityYArray,
+        setMoving: (index, value) => setBit(movingArray, index, value),
+        getMoving: (index) => getBit(movingArray, index)
     };
 }
 
@@ -75,7 +96,7 @@ export function spawnParticles() {
     // Only spawn if mouse button is down and position is valid
     if (isMouseButtonDown() && isValidPosition(mouseX, mouseY)) {
         // Random number of particles between 2 and 7
-        const numParticles = Math.floor(Math.random() * 6) + 2;
+        const numParticles = Math.floor(Math.random() * 6) + 10;
         
         for (let i = 0; i < numParticles; i++) {
             // Random x offset between -2 and 2 cells
@@ -86,7 +107,7 @@ export function spawnParticles() {
             if (isValidPosition(spawnX, mouseY)) {
                 const index = getIndexFromPosition(spawnX, mouseY);
                 typeArray[index] = ParticleType.SAND;
-                movingArray[index] = 1;
+                setBit(movingArray, index, true);
                 velocityXArray[index] = 1;
                 velocityYArray[index] = 4;
             }

@@ -6,20 +6,20 @@ import { getWriteBuffer, getIndexFromPosition, isValidPosition, ParticleType } f
 let frameCount = 0;
 
 function moveParticle(writeBuffer, x, y, currentIndex) {
+    const velocityY = writeBuffer.velocityYArray[currentIndex];
+    const velocityX = writeBuffer.velocityXArray[currentIndex];
+    const currentType = writeBuffer.typeArray[currentIndex];
+    
     const gridConfig = getGridConfig();
     const { rows } = gridConfig;
-    const velocityY = writeBuffer.velocityYArray[currentIndex];
-    const currentType = writeBuffer.typeArray[currentIndex];
     
     // Try to move down first
     let moveDistance = velocityY;
     let targetY = y + moveDistance;
     
-    // If we can't move the full distance, try shorter distances
     while (moveDistance > 0) {
         targetY = y + moveDistance;
         
-        // Check if target position is valid
         if (targetY >= rows) {
             moveDistance--;
             continue;
@@ -28,26 +28,25 @@ function moveParticle(writeBuffer, x, y, currentIndex) {
         const targetIndex = getIndexFromPosition(x, targetY);
         const targetType = writeBuffer.typeArray[targetIndex];
         
-        // If target cell is empty, move the particle
         if (targetType === ParticleType.EMPTY) {
-            // Move particle to target position
             writeBuffer.typeArray[targetIndex] = currentType;
             writeBuffer.velocityYArray[targetIndex] = velocityY;
             writeBuffer.velocityXArray[targetIndex] = writeBuffer.velocityXArray[currentIndex];
-            writeBuffer.movingArray[targetIndex] = 1;
+            writeBuffer.setMoving(targetIndex, true);
             
-            // Clear current cell
             writeBuffer.typeArray[currentIndex] = ParticleType.EMPTY;
-            writeBuffer.movingArray[currentIndex] = 0;
+            writeBuffer.setMoving(currentIndex, false);
             return true;
         }
         
         moveDistance--;
     }
 
-    // If we couldn't move down, try horizontal movement based on particle type
+    // Couldn't fall vertically — apply splash and try horizontal
+    //splash(writeBuffer, currentIndex);
     return tryHorizontalMove(writeBuffer, x, y, currentIndex);
 }
+
 
 function tryHorizontalMove(writeBuffer, x, y, currentIndex) {
     const currentType = writeBuffer.typeArray[currentIndex];
@@ -68,17 +67,24 @@ function tryHorizontalMove(writeBuffer, x, y, currentIndex) {
 }
 
 function sandHorizontalMove(writeBuffer, x, y, currentIndex, velocityX) {
+    const currentVelY = writeBuffer.velocityYArray[currentIndex];
+
+    const applySplashX = (dir) => {
+        const splashFactor = 0.1 + Math.random() * 0.4; // 10%–50% of vertical velocity
+        return dir * (Math.abs(currentVelY) * splashFactor);
+    };
+
     // Try down-left
-    const downLeftX = x - velocityX;
+    const downLeftX = x - 1;
     const downLeftY = y + 1;
     if (isValidPosition(downLeftX, downLeftY)) {
         const downLeftIndex = getIndexFromPosition(downLeftX, downLeftY);
         if (writeBuffer.typeArray[downLeftIndex] === ParticleType.EMPTY) {
             writeBuffer.typeArray[downLeftIndex] = ParticleType.SAND;
-            writeBuffer.velocityYArray[downLeftIndex] = writeBuffer.velocityYArray[currentIndex];
-            writeBuffer.velocityXArray[downLeftIndex] = velocityX;
+            writeBuffer.velocityYArray[downLeftIndex] = currentVelY;
+            writeBuffer.velocityXArray[downLeftIndex] = applySplashX(-1);
             writeBuffer.movingArray[downLeftIndex] = 1;
-            
+
             writeBuffer.typeArray[currentIndex] = ParticleType.EMPTY;
             writeBuffer.movingArray[currentIndex] = 0;
             return true;
@@ -86,16 +92,16 @@ function sandHorizontalMove(writeBuffer, x, y, currentIndex, velocityX) {
     }
 
     // Try down-right
-    const downRightX = x + velocityX;
+    const downRightX = x + 1;
     const downRightY = y + 1;
     if (isValidPosition(downRightX, downRightY)) {
         const downRightIndex = getIndexFromPosition(downRightX, downRightY);
         if (writeBuffer.typeArray[downRightIndex] === ParticleType.EMPTY) {
             writeBuffer.typeArray[downRightIndex] = ParticleType.SAND;
-            writeBuffer.velocityYArray[downRightIndex] = writeBuffer.velocityYArray[currentIndex];
-            writeBuffer.velocityXArray[downRightIndex] = velocityX;
+            writeBuffer.velocityYArray[downRightIndex] = currentVelY;
+            writeBuffer.velocityXArray[downRightIndex] = applySplashX(1);
             writeBuffer.movingArray[downRightIndex] = 1;
-            
+
             writeBuffer.typeArray[currentIndex] = ParticleType.EMPTY;
             writeBuffer.movingArray[currentIndex] = 0;
             return true;
@@ -104,6 +110,32 @@ function sandHorizontalMove(writeBuffer, x, y, currentIndex, velocityX) {
 
     return false;
 }
+
+
+let updateLeftToRight = true; 
+
+function splash(writeBuffer, currentIndex) {
+    const velY = writeBuffer.velocityYArray[currentIndex];
+    let velX = writeBuffer.velocityXArray[currentIndex];
+
+    // Convert vertical velocity into a minimum horizontal splash velocity
+    const absY = Math.max(Math.abs(velY) / 31, 0.105); // 105 scaled down for your unit system
+
+    // Maintain original X direction if it exists, otherwise randomize
+    if (velX === 0) {
+        const direction = updateLeftToRight ? 1 : -1;
+        velX = absY * direction;
+    } else {
+        velX = velX < 0 ? -absY : absY;
+    }
+
+    // Apply the splash
+    writeBuffer.velocityXArray[currentIndex] = velX;
+    writeBuffer.velocityYArray[currentIndex] *= 0.7; // Optional vertical damping
+}
+
+
+
 
 export function simulationLoop() {
     frameCount++;

@@ -11,13 +11,13 @@
   <canvas id="sandCanvas"></canvas>
 
   <!-- FPS display container -->
-  <div id="fpsDisplay" class="fps-container">
-    <span>FPS: 0</span>
+  <div class="fps-container" id="fpsDisplay">
+    <span>FPS: <span id="fpsCounter">0</span></span>
   </div>
 
   <!-- Particle counter container -->
-  <div id="particleDisplay" class="fps-container">
-    <span>Moving Particles: 0</span>
+  <div class="fps-container" id="particleDisplay">
+    <span>Particles: <span id="particleCounter">0</span></span>
   </div>
 
   <!-- README link container -->
@@ -28,10 +28,6 @@
     </button>
   </span>
 </div>
-
-
-  <!-- Debugging Grid Toggle -->
-  <button id="toggleGrid" class="toggle-button">Grid</button>
 
   <!-- Import main JavaScript file -->
   <script type="module" src="JS/Main.js"></script>

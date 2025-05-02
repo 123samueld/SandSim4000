@@ -1,56 +1,108 @@
 // Physics.js
 // Responsibility: Physics calculations and particle behavior rules
 
-// 1. Movement Physics
-// - Calculate target x,y position based on xy velocities
-// - Perform matrix traversal from current to target position
-// - If obstacle found during traversal, stop path at obstacle
-// - Update position to last valid position along path
+import { getGridConfig } from './Initialise.js';
+import { getWriteBuffer, getIndexFromPosition, isValidPosition, ParticleType } from './ParticleGrid.js';
 
-// 2. Collision Detection
-// - Check for particle-to-particle collisions
-// - Handle particle-to-boundary collisions
-// - Manage collision responses
-// - Calculate collision forces
+export function fallVertical(writeBuffer, x, y, currentIndex) {}
 
-// 3 Force Calculations
-// - Calculate gravitational forces
-// - Handle pressure forces
-// - Manage surface tension
+export function fallDiagonall(writeBuffer, x, y, currentIndex) {}
 
-// 4. State Updates
-// - Update particle velocities
-// - Update particle positions
-// - Manage energy transfer 
-
-// The file would export functions like:
-// - calculateMovement()
-// - handleCollisions()
-// - applyForces()
-
-export function calculateTargetPosition(x, y, velocityX, velocityY) {
-    // Calculate initial target position based on velocity
-    // Return raw target x,y
+function calculateTargetPosition(x, y, velocityX, velocityY) {
+    // Calculate raw target position based on current position and velocity
+    // No collision checking here, just pure position calculation
+    const targetX = Math.floor(x + velocityX);
+    const targetY = Math.floor(y + velocityY);
+    
+    return { x: targetX, y: targetY };
 }
 
-export function checkCollision(x, y) {
-    // Check if position is valid and not occupied
-    // Return true if collision detected
+function findValidPosition(startX, startY, targetX, targetY) {
+    // Get array of points along the line
+    const linePoints = bresenhamLineCalculator(startX, startY, targetX, targetY);
+    
+    // Start with the initial position
+    let lastValidX = startX;
+    let lastValidY = startY;
+    
+    // Check each point until we hit an obstacle
+    for (const point of linePoints) {
+        if (!checkCollision(point.x, point.y)) {
+            lastValidX = point.x;
+            lastValidY = point.y;
+        } else {
+            break; // Stop at first collision
+        }
+    }
+    
+    return { x: lastValidX, y: lastValidY };
 }
 
-export function findValidPosition(startX, startY, targetX, targetY) {
-    // Traverse from start to target position
-    // Use checkCollision() at each step
-    // Stop at first collision
-    // Return last valid position along path
+function checkCollision(x, y) {
+    const gridConfig = getGridConfig();
+    const writeBuffer = getWriteBuffer();
+    
+    // Check if position is within grid boundaries
+    if (!isValidPosition(x, y)) {
+        return true;
+    }
+    
+    // Check if position is occupied by a non-empty particle
+    const index = getIndexFromPosition(x, y);
+    return writeBuffer.typeArray[index] !== ParticleType.EMPTY;
 }
 
-export function updateParticlePosition(x, y, validX, validY) {
-    // Update particle position to valid target
+function updateParticlePosition(x, y, validX, validY) {
+    const writeBuffer = getWriteBuffer();
+    const currentIndex = getIndexFromPosition(x, y);
+    const targetIndex = getIndexFromPosition(validX, validY);
+    
+    // Get current particle properties
+    const currentType = writeBuffer.typeArray[currentIndex];
+    const velocityX = writeBuffer.velocityXArray[currentIndex];
+    const velocityY = writeBuffer.velocityYArray[currentIndex];
+    
+    // Move particle to new position
+    writeBuffer.typeArray[targetIndex] = currentType;
+    writeBuffer.velocityXArray[targetIndex] = velocityX;
+    writeBuffer.velocityYArray[targetIndex] = velocityY;
+    writeBuffer.setMoving(targetIndex, true);
+    
+    // Clear old position
+    writeBuffer.typeArray[currentIndex] = ParticleType.EMPTY;
+    writeBuffer.setMoving(currentIndex, false);
 }
 
-export function applyForces(x, y) {
-    // Apply all forces (gravity, pressure, surface tension)
-    // Return force effects
+// Helper function for Bresenham's line algorithm
+function bresenhamLineCalculator(startX, startY, endX, endY) {
+    const points = [];
+    let x = startX;
+    let y = startY;
+    
+    const dx = Math.abs(endX - startX);
+    const dy = Math.abs(endY - startY);
+    const sx = startX < endX ? 1 : -1;
+    const sy = startY < endY ? 1 : -1;
+    let err = dx - dy;
+    
+    while (true) {
+        // Add current point to array
+        points.push({ x, y });
+        
+        // If we reached the end point, stop
+        if (x === endX && y === endY) break;
+        
+        // Move to next position
+        const e2 = 2 * err;
+        if (e2 > -dy) {
+            err -= dy;
+            x += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y += sy;
+        }
+    }
+    
+    return points;
 }
-
